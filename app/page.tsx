@@ -20,6 +20,8 @@ export default function Home() {
     stepBack,
     isSolving,
     setIsSolving,
+    isPlaying,
+    setIsPlaying,
     error,
     setError,
   } = usePhysicsStore();
@@ -152,6 +154,12 @@ export default function Home() {
             active={isSolved}
             step={activeStep}
             stepKey={currentStep}
+            currentStep={currentStep}
+            allSteps={steps}
+            domains={sceneDocument?.domains ?? []}
+            knowns={sceneDocument?.knowns ?? {}}
+            problem={sceneDocument?.problem ?? ""}
+            isPlaying={isPlaying}
           />
         </div>
 
@@ -169,6 +177,7 @@ export default function Home() {
           <Button
             size="icon"
             className="h-11 w-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/50 disabled:opacity-30"
+            onClick={() => setIsPlaying(true)}
             disabled={!isSolved}
           >
             <Play className="h-4 w-4 ml-0.5" />
@@ -190,7 +199,11 @@ export default function Home() {
               min={0}
               max={Math.max(steps.length - 1, 0)}
               step={1}
-              onValueChange={(v) => setCurrentStep(Array.isArray(v) ? v[0] : v)}
+              onValueChange={(v) => {
+                const nextStep = Array.isArray(v) ? v[0] : v;
+                setCurrentStep(nextStep);
+                setIsPlaying(false);
+              }}
               className="w-full"
             />
           </div>

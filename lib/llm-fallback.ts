@@ -16,7 +16,7 @@ const SYSTEM_PROMPT = `You are a physics problem parser. Given a physics word pr
 
 Respond ONLY with a JSON object in this exact format — no markdown, no extra text:
 {
-  "domain": "kinematics_1d" | "kinematics_2d_projectile" | "vertical_circle" | "shm_spring" | "shm_pendulum" | "rotation" | "energy" | "momentum" | "gravitation" | "unknown",
+  "domains": ["kinematics_1d", "projectile", "vertical_circle", "shm", "rotation", "incline", "energy_conservation", "momentum", "centripetal", "gravitation", "unknown"],
   "knowns": { "key": numericValue },
   "unknowns": ["var1", "var2"],
   "objectType": "canonical_shape_name"
@@ -61,7 +61,7 @@ export async function llmFallbackParse(problem: string): Promise<ParseResult | n
     const parsed = extractJSON(raw) as ParseResult;
 
     // Basic validation
-    if (!parsed.domain || !parsed.knowns || !parsed.unknowns) return null;
+    if (!Array.isArray(parsed.domains) || parsed.domains.length === 0 || !parsed.knowns || !parsed.unknowns) return null;
 
     return { ...parsed, confidence: "high" };
   } catch (err) {

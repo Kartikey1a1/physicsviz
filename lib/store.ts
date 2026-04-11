@@ -34,6 +34,8 @@ export interface SolutionStep {
 
 export interface SceneDocument {
   problem: string;
+  domains?: string[];
+  knowns?: Record<string, number>;
   solution_steps: SolutionStep[];
 }
 
@@ -52,29 +54,33 @@ interface PhysicsVizStore {
   // UI state
   isSolving: boolean;
   setIsSolving: (v: boolean) => void;
+  isPlaying: boolean;
+  setIsPlaying: (v: boolean) => void;
   error: string | null;
   setError: (msg: string | null) => void;
 }
 
 export const usePhysicsStore = create<PhysicsVizStore>((set, get) => ({
   sceneDocument: null,
-  setSceneDocument: (doc) => set({ sceneDocument: doc, currentStep: 0, error: null }),
-  clearScene: () => set({ sceneDocument: null, currentStep: 0, error: null }),
+  setSceneDocument: (doc) => set({ sceneDocument: doc, currentStep: 0, isPlaying: false, error: null }),
+  clearScene: () => set({ sceneDocument: null, currentStep: 0, isPlaying: false, error: null }),
 
   currentStep: 0,
-  setCurrentStep: (idx) => set({ currentStep: idx }),
+  setCurrentStep: (idx) => set({ currentStep: idx, isPlaying: false }),
   stepForward: () => {
     const { currentStep, sceneDocument } = get();
     const max = (sceneDocument?.solution_steps.length ?? 1) - 1;
-    set({ currentStep: Math.min(currentStep + 1, max) });
+    set({ currentStep: Math.min(currentStep + 1, max), isPlaying: false });
   },
   stepBack: () => {
     const { currentStep } = get();
-    set({ currentStep: Math.max(currentStep - 1, 0) });
+    set({ currentStep: Math.max(currentStep - 1, 0), isPlaying: false });
   },
 
   isSolving: false,
   setIsSolving: (v) => set({ isSolving: v }),
+  isPlaying: false,
+  setIsPlaying: (v) => set({ isPlaying: v }),
   error: null,
   setError: (msg) => set({ error: msg }),
 }));

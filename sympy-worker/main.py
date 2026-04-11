@@ -36,7 +36,7 @@ app.add_middleware(
 # ─── Request / Response Models ────────────────────────────────────────────────
 
 class SolveRequest(BaseModel):
-    domain: str
+    domains: list[str]
     knowns: dict[str, float]
     unknowns: list[str]
     object_type: str = "point_mass"
@@ -122,6 +122,15 @@ def solve_energy(knowns: dict, unknowns: list[str]) -> dict:
     return {"v_f": v_f, "W": W}
 
 
+def solve_incline_energy(knowns: dict, unknowns: list[str]) -> dict:
+    m_val = knowns.get("m", 1)
+    h_val = knowns.get("h", 1)
+    g_val = knowns.get("g", 9.81)
+    v_f = float(sp.sqrt(2 * g_val * h_val))
+    W = float(m_val * g_val * h_val)
+    return {"v_f": v_f, "W": W}
+
+
 def solve_momentum(knowns: dict, unknowns: list[str]) -> dict:
     m1, m2, v1_val = knowns.get("m1", 1), knowns.get("m2", 1), knowns.get("v1", 5)
     v2_val = knowns.get("v2", 0)
@@ -146,15 +155,153 @@ def solve_projectile(knowns: dict, unknowns: list[str]) -> dict:
     return {"t_flight": round(t_flight, 4), "x_max": round(x_max, 4), "v0x": round(v0x, 4), "v0y": round(v0y, 4)}
 
 
-DOMAIN_SOLVERS = {
-    "kinematics_1d": solve_kinematics_1d,
-    "vertical_circle": solve_vertical_circle,
-    "shm_spring": solve_shm_spring,
-    "rotation": solve_rotation,
-    "energy": solve_energy,
-    "momentum": solve_momentum,
-    "kinematics_2d_projectile": solve_projectile,
+def build_kinematics_1d_equations(knowns: dict) -> list[sp.Eq]:
+    v0, a, t, d, v_f = sp.symbols("v0 a t d v_f", real=True)
+    return [
+        sp.Eq(d, v0 * t + sp.Rational(1, 2) * a * t**2),
+        sp.Eq(v_f, v0 + a * t),
+    ]
+
+
+def build_projectile_equations(knowns: dict) -> list[sp.Eq]:
+    v0, angle, t_flight, x_max, h0, g, v_impact = sp.symbols("v0 angle t_flight x_max h0 g v_impact", real=True)
+    projectile_velocity = sp.sqrt(
+        (v0 * sp.cos(angle * sp.pi / 180)) ** 2
+        + (v0 * sp.sin(angle * sp.pi / 180) - g * t_flight) ** 2
+    )
+    return [
+        sp.Eq(x_max, v0 * sp.cos(angle * sp.pi / 180) * t_flight),
+        sp.Eq(0, h0 + v0 * sp.sin(angle * sp.pi / 180) * t_flight - sp.Rational(1, 2) * g * t_flight**2),
+        sp.Eq(v_impact, projectile_velocity),
+    ]
+
+
+def build_centripetal_equations(knowns: dict) -> list[sp.Eq]:
+    m, v, r, F_net = sp.symbols("m v r F_net", real=True)
+    return [sp.Eq(m * v**2 / r, F_net)]
+
+
+def build_shm_equations(knowns: dict) -> list[sp.Eq]:
+    x, A, omega, t, phi = sp.symbols("x A omega t phi", real=True)
+    return [sp.Eq(x, A * sp.cos(omega * t + phi))]
+
+
+def build_rotation_equations(knowns: dict) -> list[sp.Eq]:
+    tau, I, alpha, omega0, omega_f, t, theta = sp.symbols("tau I alpha omega0 omega_f t theta", real=True)
+    return [
+        sp.Eq(tau, I * alpha),
+        sp.Eq(omega_f, omega0 + alpha * t),
+        sp.Eq(theta, omega0 * t + sp.Rational(1, 2) * alpha * t**2),
+    ]
+
+
+def build_incline_equations(knowns: dict) -> list[sp.Eq]:
+    m, g, h, v_f = sp.symbols("m g h v_f", real=True)
+    eqs = [sp.Eq(m * g * h, sp.Rational(1, 2) * m * v_f**2)]
+    angle = knowns.get("angle")
+    if angle is not None:
+        N = sp.symbols("N", real=True)
+        eqs.append(sp.Eq(N, m * g * sp.cos(angle * sp.pi / 180)))
+    return eqs
+
+
+def build_energy_conservation_equations(knowns: dict) -> list[sp.Eq]:
+    m, v0, v_f, g, h = sp.symbols("m v0 v_f g h", real=True)
+    return [sp.Eq(sp.Rational(1, 2) * m * v0**2 + m * g * h, sp.Rational(1, 2) * m * v_f**2)]
+
+
+def build_momentum_equations(knowns: dict) -> list[sp.Eq]:
+    m, v, p, F, t, J = sp.symbols("m v p F t J", real=True)
+    return [
+        sp.Eq(p, m * v),
+        sp.Eq(J, F * t),
+    ]
+
+
+def build_gravitation_equations(knowns: dict) -> list[sp.Eq]:
+    G, m1, m2, r, F = sp.symbols("G m1 m2 r F", real=True)
+    return [sp.Eq(F, G * m1 * m2 / r**2)]
+
+
+EQUATION_BUILDERS = {
+    "kinematics_1d": build_kinematics_1d_equations,
+    "projectile": build_projectile_equations,
+    "vertical_circle": build_centripetal_equations,
+    "centripetal": build_centripetal_equations,
+    "shm": build_shm_equations,
+    "rotation": build_rotation_equations,
+    "incline": build_incline_equations,
+    "energy_conservation": build_energy_conservation_equations,
+    "momentum": build_momentum_equations,
+    "gravitation": build_gravitation_equations,
 }
+
+
+def collect_equations(domains: list[str], knowns: dict) -> list[sp.Eq]:
+    equations: list[sp.Eq] = []
+    for domain in domains:
+        builder = EQUATION_BUILDERS.get(domain)
+        if not builder:
+            raise HTTPException(status_code=422, detail=f"No equation builder for domain tag: {domain}")
+        equations.extend(builder(knowns))
+    return equations
+
+
+def _symbol_for(name: str):
+    try:
+        return sp.symbols(name)
+    except Exception:
+        return None
+
+
+def solve_equations(domains: list[str], knowns: dict, unknowns: list[str]) -> dict:
+    equations = collect_equations(domains, knowns)
+    known_subs = {}
+    for name, value in knowns.items():
+        sym = _symbol_for(name)
+        if sym is not None:
+            known_subs[sym] = value
+
+    substituted = [eq.subs(known_subs) for eq in equations]
+    all_symbols = set().union(*(eq.free_symbols for eq in substituted))
+    unknown_symbols = [sym for sym in all_symbols if str(sym) in unknowns]
+    if not unknown_symbols:
+        unknown_symbols = [sym for sym in all_symbols if sym not in known_subs]
+    if not unknown_symbols:
+        raise HTTPException(status_code=422, detail="No unknown variables found in equations.")
+
+    solved_list = sp.solve(substituted, unknown_symbols, dict=True)
+    if not solved_list:
+        raise HTTPException(status_code=422, detail="Could not solve the requested equations.")
+
+    solution = solved_list[0]
+    solved = {}
+    for sym, val in solution.items():
+        try:
+            solved[str(sym)] = float(val)
+        except Exception:
+            try:
+                solved[str(sym)] = float(val.evalf())
+            except Exception:
+                solved[str(sym)] = str(val)
+    return solved
+
+
+def build_steps_for_domains(domains: list[str], knowns: dict, solved: dict, object_type: str) -> list[dict]:
+    steps: list[dict] = []
+    for domain in domains:
+        if domain == "energy_conservation" and "incline" in domains:
+            continue
+        if domain == "centripetal":
+            steps.extend(build_steps_for_domain("vertical_circle", knowns, solved, object_type))
+        else:
+            steps.extend(build_steps_for_domain(domain, knowns, solved, object_type))
+    return steps or [{
+        "step_id": 1, "concept": "Problem Parsed",
+        "explanation": "Domain recognized but detailed steps not yet implemented.",
+        "math_latex": "\\text{See knowns and solved values}",
+        "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": []},
+    }]
 
 # Scale factor: 1 physical meter = DISPLAY_SCALE canvas pixels.
 # Used consistently across ALL domain builders — never hardcode a pixel value.
@@ -230,7 +377,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
             },
         ]
 
-    elif domain == "shm_spring":
+    elif domain == "shm":
         k = knowns.get("k", 10)
         m = knowns.get("m", 1)
         A = knowns.get("A", 0.1)
@@ -292,7 +439,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
             },
         ]
 
-    elif domain == "energy":
+    elif domain == "energy_conservation":
         v_f = float(solved.get("v_f", 0))
         W = float(solved.get("W", 0))
         h = knowns.get("h", 1)
@@ -313,6 +460,36 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 "simulation_state": {"time_range": [0, t_approx], "animations": [
                     {"target": "object", "type": "polynomial", "params": {"c0": 0, "c1": knowns.get("v0", 0) * DISPLAY_SCALE, "c2": 0.5 * g * DISPLAY_SCALE}}
                 ], "vectors": []},
+            },
+        ]
+
+    elif domain == "incline":
+        m_val = knowns.get("m", 1)
+        v_f = float(solved.get("v_f", 0))
+        W = float(solved.get("W", 0))
+        h = knowns.get("h", 1)
+        return [
+            {
+                "step_id": 1, "concept": "Conservation of Mechanical Energy",
+                "explanation": "On a frictionless incline, potential energy is converted entirely into kinetic energy.",
+                "math_latex": "mgh = \\frac{1}{2}mv_f^2",
+                "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": [
+                    {"label": "mg", "direction": [0, -1], "magnitude": g, "color": "#ef4444"},
+                ]},
+            },
+            {
+                "step_id": 2, "concept": "Solve for Final Speed",
+                "explanation": f"Solve mgh = ½mv_f² for v_f, giving v_f = √(2gh) = {v_f:.3f} m/s.",
+                "math_latex": f"v_f = \\sqrt{{2gh}} = {v_f:.3f}\\,\\text{{m/s}}",
+                "simulation_state": {"time_range": [0, 1], "animations": [
+                    {"target": "object", "type": "linear", "params": {"start": [0, 0], "end": [h * DISPLAY_SCALE, 0], "duration": 1}}
+                ], "vectors": []},
+            },
+            {
+                "step_id": 3, "concept": "Work Done by Gravity",
+                "explanation": f"The work done by gravity equals the loss in potential energy: W = mgh = {W:.2f} J.",
+                "math_latex": f"W = mgh = {m_val} \\cdot {g} \\cdot {h} = {W:.2f}\\,\\text{{J}}",
+                "simulation_state": {"time_range": [1, 1], "animations": [], "vectors": []},
             },
         ]
 
@@ -340,17 +517,22 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
             },
         ]
 
-    elif domain == "kinematics_2d_projectile":
+    elif domain == "projectile":
+        import math
+        v0 = knowns.get("v0", 0)
+        angle_deg = knowns.get("angle", 0)
+        v0x = float(solved.get("v0x", v0 * math.cos(math.radians(angle_deg))))
+        v0y = float(solved.get("v0y", v0 * math.sin(math.radians(angle_deg))))
         t_flight = float(solved.get("t_flight", 1))
         x_max = float(solved.get("x_max", 10))
         return [
             {
                 "step_id": 1, "concept": "Decompose Initial Velocity",
-                "explanation": f"Split v₀ into components: v₀ₓ = {solved.get('v0x', 0):.2f} m/s, v₀ᵧ = {solved.get('v0y', 0):.2f} m/s",
-                "math_latex": f"v_{{0x}} = v_0\\cos\\theta = {solved.get('v0x', 0):.2f}\\,\\text{{m/s}}, \\quad v_{{0y}} = v_0\\sin\\theta = {solved.get('v0y', 0):.2f}\\,\\text{{m/s}}",
+                "explanation": f"Split v₀ into components: v₀ₓ = {v0x:.2f} m/s, v₀ᵧ = {v0y:.2f} m/s",
+                "math_latex": f"v_{{0x}} = v_0\\cos\\theta = {v0x:.2f}\\,\\text{{m/s}}, \\quad v_{{0y}} = v_0\\sin\\theta = {v0y:.2f}\\,\\text{{m/s}}",
                 "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": [
-                    {"label": "v₀ₓ", "direction": [1, 0], "magnitude": solved.get("v0x", 0), "color": "#3b82f6"},
-                    {"label": "v₀ᵧ", "direction": [0, 1], "magnitude": solved.get("v0y", 0), "color": "#22c55e"},
+                    {"label": "v₀ₓ", "direction": [1, 0], "magnitude": v0x, "color": "#3b82f6"},
+                    {"label": "v₀ᵧ", "direction": [0, 1], "magnitude": v0y, "color": "#22c55e"},
                 ]},
             },
             {
@@ -359,7 +541,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 "math_latex": f"t_{{\\text{{flight}}}} = {t_flight:.3f}\\,\\text{{s}}",
                 "simulation_state": {"time_range": [0, t_flight], "animations": [
                     {"target": "object", "type": "projectile", "params": {
-                        "v0x": solved.get("v0x", 0), "v0y": solved.get("v0y", 0), "g": knowns.get("g", 9.81)
+                        "v0x": v0x, "v0y": v0y, "g": knowns.get("g", 9.81)
                     }}
                 ], "vectors": []},
             },
@@ -390,16 +572,17 @@ async def warmup():
 
 @app.post("/solve")
 async def solve(req: SolveRequest):
-    solver = DOMAIN_SOLVERS.get(req.domain)
-    if not solver:
-        raise HTTPException(status_code=422, detail=f"No solver for domain: {req.domain}")
+    if not req.domains:
+        raise HTTPException(status_code=422, detail="No domains provided for solve request.")
 
     try:
-        solved = solver(req.knowns, req.unknowns)
+        solved = solve_equations(req.domains, req.knowns, req.unknowns)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"SymPy solver error: {str(e)}")
 
-    steps = build_steps_for_domain(req.domain, req.knowns, solved, req.object_type)
+    steps = build_steps_for_domains(req.domains, req.knowns, solved, req.object_type)
 
     # Latex results for display
     latex = {k: f"{v:.4g}" for k, v in solved.items() if isinstance(v, (int, float))}

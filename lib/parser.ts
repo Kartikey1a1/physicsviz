@@ -9,20 +9,21 @@
  */
 import synonyms from "./synonyms.json";
 
-export type PhysicsDomain =
+export type PhysicsTag =
   | "kinematics_1d"
-  | "kinematics_2d_projectile"
+  | "projectile"
   | "vertical_circle"
-  | "shm_spring"
-  | "shm_pendulum"
+  | "shm"
   | "rotation"
-  | "energy"
+  | "incline"
+  | "energy_conservation"
   | "momentum"
+  | "centripetal"
   | "gravitation"
   | "unknown";
 
 export interface ParseResult {
-  domain: PhysicsDomain;
+  domains: PhysicsTag[];
   knowns: Record<string, number>;
   unknowns: string[];
   objectType: string;
@@ -69,7 +70,7 @@ function try1DKinematics(text: string): ParseResult | null {
   if (unknowns.length === 0) unknowns.push("d");
 
   return {
-    domain: "kinematics_1d",
+    domains: ["kinematics_1d"],
     knowns: { a, t, v0 },
     unknowns,
     objectType: resolveObject(text),
@@ -84,7 +85,7 @@ function tryVerticalCircle(text: string): ParseResult | null {
   const m = extractNum(text, [/(\d+\.?\d*)\s*kg/i]);
 
   return {
-    domain: "vertical_circle",
+    domains: ["centripetal"],
     knowns: { r: r ?? 1, m: m ?? 1, g: 9.81 },
     unknowns: ["v_min"],
     objectType: resolveObject(text),
@@ -100,11 +101,28 @@ function trySHMSpring(text: string): ParseResult | null {
   const A = extractNum(text, [/amplitude.*?(\d+\.?\d*)/i, /(\d+\.?\d*)\s*m(?:eters?)?\s*(?:from|amplitude)/i]);
 
   return {
-    domain: "shm_spring",
+    domains: ["shm"],
     knowns: { k: k ?? 10, m: m ?? 1, A: A ?? 0.1, g: 9.81 },
     unknowns: ["omega", "T", "v_max"],
     objectType: "spring",
     confidence: k !== null && m !== null ? "high" : "low",
+  };
+}
+
+function tryInclineEnergy(text: string): ParseResult | null {
+  if (!/\b(?:ramp|incline|slope|slides? down|sliding down|frictionless surface|frictionless ramp|frictionless)\b/i.test(text)) return null;
+
+  const h = extractNum(text, [/height.*?(\d+\.?\d*)/i, /h\s*=\s*(\d+\.?\d*)/i, /(\d+\.?\d*)\s*m\s*(?:high|above|tall)/i]);
+  if (h === null) return null;
+
+  const m = extractNum(text, [/(\d+\.?\d*)\s*kg/i]) ?? 1;
+
+  return {
+    domains: ["incline", "energy_conservation"],
+    knowns: { m, h, g: 9.81 },
+    unknowns: ["v_f", "W"],
+    objectType: resolveObject(text),
+    confidence: "high",
   };
 }
 
@@ -116,7 +134,7 @@ function tryProjectile(text: string): ParseResult | null {
   const h = extractNum(text, [/height.*?(\d+\.?\d*)/i, /(\d+\.?\d*)\s*m\s*(?:high|above)/i]) ?? 0;
 
   return {
-    domain: "kinematics_2d_projectile",
+    domains: ["projectile"],
     knowns: { v0: v0 ?? 10, angle: angle ?? 45, h0: h, g: 9.81 },
     unknowns: ["x_max", "t_flight", "v_impact"],
     objectType: resolveObject(text),
@@ -132,7 +150,7 @@ function tryRotation(text: string): ParseResult | null {
   const omega0 = extractNum(text, [/initial.*?angular.*?(\d+\.?\d*)/i, /omega.*?0.*?(\d+\.?\d*)/i]) ?? 0;
 
   return {
-    domain: "rotation",
+    domains: ["rotation"],
     knowns: { tau: tau ?? 0, I: I ?? 1, omega0 },
     unknowns: ["alpha", "omega_f", "theta"],
     objectType: resolveObject(text),
@@ -148,7 +166,7 @@ function tryEnergy(text: string): ParseResult | null {
   const v0 = extractNum(text, [/(\d+\.?\d*)\s*m\/s/i]) ?? 0;
 
   return {
-    domain: "energy",
+    domains: ["energy_conservation"],
     knowns: { m: m ?? 1, h: h ?? 1, v0, g: 9.81 },
     unknowns: ["v_f", "W"],
     objectType: resolveObject(text),
@@ -165,7 +183,7 @@ function tryMomentum(text: string): ParseResult | null {
   const isElastic = /elastic/i.test(text) && !/inelastic/i.test(text);
 
   return {
-    domain: "momentum",
+    domains: ["momentum"],
     knowns: { m1: m1 ?? 1, m2: m2 ?? 1, v1: v1 ?? 5, v2: 0 },
     unknowns: isElastic ? ["v1_f", "v2_f"] : ["v_f"],
     objectType: "point_mass",
@@ -179,6 +197,7 @@ export function parsePhysicsProblem(text: string): ParseResult {
   const attempts = [
     tryVerticalCircle,
     trySHMSpring,
+    tryInclineEnergy,
     tryProjectile,
     tryRotation,
     tryMomentum,
@@ -193,7 +212,7 @@ export function parsePhysicsProblem(text: string): ParseResult {
 
   // Layer 1 gave up — signal Layer 2
   return {
-    domain: "unknown",
+    domains: ["unknown"],
     knowns: {},
     unknowns: [],
     objectType: resolveObject(text),

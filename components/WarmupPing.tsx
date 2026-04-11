@@ -43,15 +43,16 @@ export default function WarmupPing() {
   return (
     <div
       aria-live="polite"
-      className={`fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-mono backdrop-blur-sm transition-all duration-700 ${bg}`}
-    >
-      <span className="relative flex h-2 w-2">
-        {status === "warming" && (
-          <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${dot}`} />
-        )}
-        <span className={`relative inline-flex h-2 w-2 rounded-full ${status !== "warming" ? dot : "bg-yellow-400"}`} />
-      </span>
-      {label}
-    </div>
+      className={`fixed top-4 right-4 z-50 w-3 h-3 rounded-full transition-all duration-700 ${
+        status === "ready" ? "bg-green-500" :
+        status === "failed" ? "bg-yellow-500" :
+        "bg-yellow-500 animate-pulse"
+      }`}
+      title={
+        status === "ready" ? "Math engine ready" :
+        status === "failed" ? "Math engine unreachable" :
+        "Math engine warming..."
+      }
+    />
   );
 }

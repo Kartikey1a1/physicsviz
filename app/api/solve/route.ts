@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   }
 
   // ── Layer 4: Honest error if still unknown ───────────────────────────────────
-  if (parsed.domain === "unknown") {
+  if (parsed.domains.length === 0 || parsed.domains.includes("unknown")) {
     // TODO: append unrecognized phrasing to lib/synonyms.json via a logging endpoint
     return NextResponse.json({
       detail: "Sorry, I couldn't recognize this physics scenario. Try rephrasing or check that it's an AP Physics C: Mechanics problem.",
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        domain: parsed.domain,
+        domains: parsed.domains,
         knowns: parsed.knowns,
         unknowns: parsed.unknowns,
         object_type: parsed.objectType,
@@ -96,7 +96,9 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     problem,
-    domain: parsed.domain,
+    domain: parsed.domains[0] ?? "unknown",
+    domains: parsed.domains,
+    knowns: parsed.knowns,
     solution_steps: workerData.solution_steps,
   });
 }
