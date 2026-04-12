@@ -402,6 +402,11 @@ def build_steps_for_domains(domains: list[str], knowns: dict, solved: dict, unkn
     }]
 
     target_vars = set(unknowns)
+    for unk in unknowns:
+        alias = ALIASES.get(unk)
+        if alias:
+            target_vars.add(alias)
+
     kept_steps = []
     
     for step in reversed(raw_steps):
