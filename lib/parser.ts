@@ -95,7 +95,7 @@ export function extractExplicitUnknowns(text: string, fallback: string[]): strin
     "spring constant": "k",
     "angle": "theta"
   };
-  
+
   const sortedKeys = Object.keys(symbolMap).sort((a, b) => b.length - a.length);
 
   let match;
