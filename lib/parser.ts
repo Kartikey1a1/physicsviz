@@ -52,6 +52,52 @@ function resolveObject(text: string): string {
   return "point_mass"; // safe fallback
 }
 
+/** Extract what the user explicitly requested */
+export function extractExplicitUnknowns(text: string, fallback: string[]): string[] {
+  const regex = /(?:find|what\s+is|calculate|determine|solve\s+for)(?:\s+the)?\s+([a-z\s]+)/ig;
+  const unknowns = new Set<string>();
+
+  const symbolMap: Record<string, string> = {
+    "initial velocity": "v0",
+    "initial speed": "v0",
+    "final velocity": "v",
+    "final speed": "v",
+    "velocity": "v",
+    "speed": "v",
+    "time": "t",
+    "distance": "d",
+    "displacement": "d",
+    "acceleration": "a",
+    "work": "W",
+    "energy": "E",
+    "radius": "r",
+    "period": "T",
+    "frequency": "f",
+    "angular velocity": "omega",
+    "angular speed": "omega",
+    "angular acceleration": "alpha",
+    "torque": "tau",
+    "momentum": "p",
+    "force": "F",
+    "angle": "theta"
+  };
+  
+  const sortedKeys = Object.keys(symbolMap).sort((a, b) => b.length - a.length);
+
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    let targetPhrase = match[1].toLowerCase();
+    for (const key of sortedKeys) {
+      if (targetPhrase.includes(key)) {
+        unknowns.add(symbolMap[key]);
+        targetPhrase = targetPhrase.replace(key, "");
+      }
+    }
+  }
+
+  return unknowns.size > 0 ? Array.from(unknowns) : fallback;
+}
+
 // ─── Domain Patterns ──────────────────────────────────────────────────────────
 
 function try1DKinematics(text: string): ParseResult | null {
@@ -207,7 +253,10 @@ export function parsePhysicsProblem(text: string): ParseResult {
 
   for (const attempt of attempts) {
     const result = attempt(text);
-    if (result) return result;
+    if (result) {
+      result.unknowns = extractExplicitUnknowns(text, result.unknowns);
+      return result;
+    }
   }
 
   // Layer 1 gave up — signal Layer 2
