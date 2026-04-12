@@ -20,22 +20,15 @@ interface Props {
 export default function SimulationCanvas({ active, step, stepKey, currentStep, allSteps, domains, knowns, problem, isPlaying }: Props) {
   const controls = useAnimationControls();
 
-  if (!active || !step) {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-slate-600 font-mono text-sm opacity-50">
-        <div className="text-3xl">⚛</div>
-        <div>[ Simulation Awaiting Input ]</div>
-      </div>
-    );
-  }
 
-  const sim = step.simulation_state;
-  const animations = sim.animations ?? [];
-  const vectors = sim.vectors ?? [];
-  const t_end = sim.time_range?.[1] ?? 0;
+
+  const sim = step?.simulation_state;
+  const animations = sim?.animations ?? [];
+  const vectors = sim?.vectors ?? [];
+  const t_end = sim?.time_range?.[1] ?? 0;
   const isFreezeStep = t_end === 0;
   const isStatic = isFreezeStep || animations.length === 0;
-  const frozenPosition = getFrozenPosition(currentStep, allSteps);
+  const frozenPosition = step ? getFrozenPosition(currentStep, allSteps) : { x: 0, y: 0, rotate: 0 };
 
   // Pick first animation to determine object motion from ANIMATION_REGISTRY
   const primaryAnim = animations[0];
@@ -98,6 +91,15 @@ export default function SimulationCanvas({ active, step, stepKey, currentStep, a
       },
     });
   }, [active, stepKey, isPlaying, targetX, targetY, targetRotate, t_end, isStatic, primaryAnim?.type, controls]);
+
+  if (!active || !step) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-slate-600 font-mono text-sm opacity-50">
+        <div className="text-3xl">⚛</div>
+        <div>[ Simulation Awaiting Input ]</div>
+      </div>
+    );
+  }
 
   return (
     <div
