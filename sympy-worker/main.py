@@ -15,6 +15,7 @@ from typing import Any, Optional
 import os
 import sympy as sp
 import json
+import traceback
 
 SYMBOLS = {
     "v":     sp.Symbol("v",     real=True, positive=True),
@@ -720,19 +721,19 @@ async def warmup():
 
 @app.post("/solve")
 async def solve(req: SolveRequest):
-    if not req.domains:
-        raise HTTPException(status_code=422, detail="No domains provided for solve request.")
-
     try:
+        if not req.domains:
+            raise HTTPException(status_code=422, detail="No domains provided for solve request.")
+
         solved = solve_equations(req.domains, req.knowns, req.unknowns)
+        steps = build_steps_for_domains(req.domains, req.knowns, solved, req.unknowns, req.object_type)
+
+        # Latex results for display
+        latex = {k: f"{v:.4g}" for k, v in solved.items() if isinstance(v, (int, float))}
+
+        return SolveResponse(solved=solved, solution_steps=steps, latex_results=latex)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"SymPy solver error: {str(e)}")
-
-    steps = build_steps_for_domains(req.domains, req.knowns, solved, req.unknowns, req.object_type)
-
-    # Latex results for display
-    latex = {k: f"{v:.4g}" for k, v in solved.items() if isinstance(v, (int, float))}
-
-    return SolveResponse(solved=solved, solution_steps=steps, latex_results=latex)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
