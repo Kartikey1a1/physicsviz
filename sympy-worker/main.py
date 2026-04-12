@@ -16,6 +16,46 @@ import os
 import sympy as sp
 import json
 
+SYMBOLS = {
+    "v":     sp.Symbol("v",     real=True, positive=True),
+    "v0":    sp.Symbol("v0",    real=True, nonnegative=True),
+    "h":     sp.Symbol("h",     real=True, positive=True),
+    "g":     sp.Symbol("g",     real=True, positive=True),
+    "m":     sp.Symbol("m",     real=True, positive=True),
+    "r":     sp.Symbol("r",     real=True, positive=True),
+    "k":     sp.Symbol("k",     real=True, positive=True),
+    "A":     sp.Symbol("A",     real=True, positive=True),
+    "omega": sp.Symbol("omega", real=True, positive=True),
+    "theta": sp.Symbol("theta", real=True, positive=True),
+    "I":     sp.Symbol("I",     real=True, positive=True),
+    "alpha": sp.Symbol("alpha", real=True),
+    "tau":   sp.Symbol("tau",   real=True),
+    "T":     sp.Symbol("T",     real=True, positive=True),
+    "t":     sp.Symbol("t",     real=True, nonnegative=True),
+    # Additional symbols found in the code
+    "v_f":   sp.Symbol("v_f",   real=True),
+    "a":     sp.Symbol("a",     real=True),
+    "d":     sp.Symbol("d",     real=True),
+    "angle": sp.Symbol("angle", real=True),
+    "t_flight": sp.Symbol("t_flight", real=True),
+    "x_max": sp.Symbol("x_max", real=True),
+    "h0":    sp.Symbol("h0",    real=True),
+    "v_impact": sp.Symbol("v_impact", real=True),
+    "F_net": sp.Symbol("F_net", real=True),
+    "x":     sp.Symbol("x",     real=True),
+    "phi":   sp.Symbol("phi",   real=True),
+    "omega0":sp.Symbol("omega0", real=True),
+    "omega_f":sp.Symbol("omega_f", real=True),
+    "N":     sp.Symbol("N",     real=True),
+    "p":     sp.Symbol("p",     real=True),
+    "F":     sp.Symbol("F",     real=True),
+    "J":     sp.Symbol("J",     real=True),
+    "G":     sp.Symbol("G",     real=True),
+    "m1":    sp.Symbol("m1",    real=True),
+    "m2":    sp.Symbol("m2",    real=True),
+}
+
+
 
 app = FastAPI(title="PhysicsViz SymPy Worker")
 
@@ -51,7 +91,11 @@ class SolveResponse(BaseModel):
 # ─── Domain Solvers ───────────────────────────────────────────────────────────
 
 def solve_kinematics_1d(knowns: dict, unknowns: list[str]) -> dict:
-    v0, a, t, d, v_f = sp.symbols("v0 a t d v_f")
+    v0 = SYMBOLS['v0']
+    a = SYMBOLS['a']
+    t = SYMBOLS['t']
+    d = SYMBOLS['d']
+    v_f = SYMBOLS['v_f']
     eqs = [
         sp.Eq(d, v0 * t + sp.Rational(1, 2) * a * t**2),
         sp.Eq(v_f, v0 + a * t),
@@ -71,7 +115,11 @@ def solve_kinematics_1d(knowns: dict, unknowns: list[str]) -> dict:
 
 
 def solve_vertical_circle(knowns: dict, unknowns: list[str]) -> dict:
-    m, g, r, T, v = sp.symbols("m g r T v", positive=True)
+    m = SYMBOLS['m']
+    g = SYMBOLS['g']
+    r = SYMBOLS['r']
+    T = SYMBOLS['T']
+    v = SYMBOLS['v']
     # At bottom: T - mg = mv²/r  →  v_min at top: T=0 → v² = gr
     v_min = sp.sqrt(knowns.get("g", 9.81) * knowns.get("r", 1))
     v_bottom = sp.sqrt(5 * knowns.get("g", 9.81) * knowns.get("r", 1))
@@ -82,7 +130,9 @@ def solve_shm_spring(knowns: dict, unknowns: list[str]) -> dict:
     k_val = knowns.get("k", 10)
     m_val = knowns.get("m", 1)
     A_val = knowns.get("A", 0.1)
-    k, m, A = sp.symbols("k m A", positive=True)
+    k = SYMBOLS['k']
+    m = SYMBOLS['m']
+    A = SYMBOLS['A']
     omega = sp.sqrt(k / m)
     T = 2 * sp.pi / omega
     v_max = A * omega
@@ -99,7 +149,13 @@ def solve_rotation(knowns: dict, unknowns: list[str]) -> dict:
     I_val = knowns.get("I", 1)
     omega0_val = knowns.get("omega0", 0)
     t_val = knowns.get("t", 1)
-    tau, I, alpha, omega0, omega_f, t, theta = sp.symbols("tau I alpha omega0 omega_f t theta")
+    tau = SYMBOLS['tau']
+    I = SYMBOLS['I']
+    alpha = SYMBOLS['alpha']
+    omega0 = SYMBOLS['omega0']
+    omega_f = SYMBOLS['omega_f']
+    t = SYMBOLS['t']
+    theta = SYMBOLS['theta']
     eqs = [
         sp.Eq(tau, I * alpha),
         sp.Eq(omega_f, omega0 + alpha * t),
@@ -156,7 +212,11 @@ def solve_projectile(knowns: dict, unknowns: list[str]) -> dict:
 
 
 def build_kinematics_1d_equations(knowns: dict) -> list[sp.Eq]:
-    v0, a, t, d, v_f = sp.symbols("v0 a t d v_f", real=True)
+    v0 = SYMBOLS['v0']
+    a = SYMBOLS['a']
+    t = SYMBOLS['t']
+    d = SYMBOLS['d']
+    v_f = SYMBOLS['v_f']
     return [
         sp.Eq(d, v0 * t + sp.Rational(1, 2) * a * t**2),
         sp.Eq(v_f, v0 + a * t),
@@ -164,7 +224,13 @@ def build_kinematics_1d_equations(knowns: dict) -> list[sp.Eq]:
 
 
 def build_projectile_equations(knowns: dict) -> list[sp.Eq]:
-    v0, angle, t_flight, x_max, h0, g, v_impact = sp.symbols("v0 angle t_flight x_max h0 g v_impact", real=True)
+    v0 = SYMBOLS['v0']
+    angle = SYMBOLS['angle']
+    t_flight = SYMBOLS['t_flight']
+    x_max = SYMBOLS['x_max']
+    h0 = SYMBOLS['h0']
+    g = SYMBOLS['g']
+    v_impact = SYMBOLS['v_impact']
     projectile_velocity = sp.sqrt(
         (v0 * sp.cos(angle * sp.pi / 180)) ** 2
         + (v0 * sp.sin(angle * sp.pi / 180) - g * t_flight) ** 2
@@ -177,17 +243,30 @@ def build_projectile_equations(knowns: dict) -> list[sp.Eq]:
 
 
 def build_centripetal_equations(knowns: dict) -> list[sp.Eq]:
-    m, v, r, F_net = sp.symbols("m v r F_net", real=True)
+    m = SYMBOLS['m']
+    v = SYMBOLS['v']
+    r = SYMBOLS['r']
+    F_net = SYMBOLS['F_net']
     return [sp.Eq(m * v**2 / r, F_net)]
 
 
 def build_shm_equations(knowns: dict) -> list[sp.Eq]:
-    x, A, omega, t, phi = sp.symbols("x A omega t phi", real=True)
+    x = SYMBOLS['x']
+    A = SYMBOLS['A']
+    omega = SYMBOLS['omega']
+    t = SYMBOLS['t']
+    phi = SYMBOLS['phi']
     return [sp.Eq(x, A * sp.cos(omega * t + phi))]
 
 
 def build_rotation_equations(knowns: dict) -> list[sp.Eq]:
-    tau, I, alpha, omega0, omega_f, t, theta = sp.symbols("tau I alpha omega0 omega_f t theta", real=True)
+    tau = SYMBOLS['tau']
+    I = SYMBOLS['I']
+    alpha = SYMBOLS['alpha']
+    omega0 = SYMBOLS['omega0']
+    omega_f = SYMBOLS['omega_f']
+    t = SYMBOLS['t']
+    theta = SYMBOLS['theta']
     return [
         sp.Eq(tau, I * alpha),
         sp.Eq(omega_f, omega0 + alpha * t),
@@ -196,22 +275,34 @@ def build_rotation_equations(knowns: dict) -> list[sp.Eq]:
 
 
 def build_incline_equations(knowns: dict) -> list[sp.Eq]:
-    m, g, h, v = sp.symbols("m g h v", real=True)
+    m = SYMBOLS['m']
+    g = SYMBOLS['g']
+    h = SYMBOLS['h']
+    v = SYMBOLS['v']
     eqs = [sp.Eq(m * g * h, sp.Rational(1, 2) * m * v**2)]
     angle = knowns.get("angle")
     if angle is not None:
-        N = sp.symbols("N", real=True)
+        N = SYMBOLS['N']
         eqs.append(sp.Eq(N, m * g * sp.cos(angle * sp.pi / 180)))
     return eqs
 
 
 def build_energy_conservation_equations(knowns: dict) -> list[sp.Eq]:
-    m, v0, v, g, h = sp.symbols("m v0 v g h", real=True)
+    m = SYMBOLS['m']
+    v0 = SYMBOLS['v0']
+    v = SYMBOLS['v']
+    g = SYMBOLS['g']
+    h = SYMBOLS['h']
     return [sp.Eq(sp.Rational(1, 2) * m * v0**2 + m * g * h, sp.Rational(1, 2) * m * v**2)]
 
 
 def build_momentum_equations(knowns: dict) -> list[sp.Eq]:
-    m, v, p, F, t, J = sp.symbols("m v p F t J", real=True)
+    m = SYMBOLS['m']
+    v = SYMBOLS['v']
+    p = SYMBOLS['p']
+    F = SYMBOLS['F']
+    t = SYMBOLS['t']
+    J = SYMBOLS['J']
     return [
         sp.Eq(p, m * v),
         sp.Eq(J, F * t),
@@ -219,7 +310,11 @@ def build_momentum_equations(knowns: dict) -> list[sp.Eq]:
 
 
 def build_gravitation_equations(knowns: dict) -> list[sp.Eq]:
-    G, m1, m2, r, F = sp.symbols("G m1 m2 r F", real=True)
+    G = SYMBOLS['G']
+    m1 = SYMBOLS['m1']
+    m2 = SYMBOLS['m2']
+    r = SYMBOLS['r']
+    F = SYMBOLS['F']
     return [sp.Eq(F, G * m1 * m2 / r**2)]
 
 
@@ -248,10 +343,7 @@ def collect_equations(domains: list[str], knowns: dict) -> list[sp.Eq]:
 
 
 def _symbol_for(name: str):
-    try:
-        return sp.symbols(name)
-    except Exception:
-        return None
+    return SYMBOLS.get(name)
 
 
 def solve_equations(domains: list[str], knowns: dict, unknowns: list[str]) -> dict:
