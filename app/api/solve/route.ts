@@ -82,6 +82,7 @@ export async function POST(req: Request) {
   }
 
   const workerData = await workerRes.json();
+  console.log("Railway returned steps:", workerData.solution_steps?.length);
 
   // ── Parallel Array Contract Validation ──────────────────────────────────────
   // Guard 1: array must exist and be non-empty
