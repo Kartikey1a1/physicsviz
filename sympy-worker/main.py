@@ -196,8 +196,8 @@ def build_rotation_equations(knowns: dict) -> list[sp.Eq]:
 
 
 def build_incline_equations(knowns: dict) -> list[sp.Eq]:
-    m, g, h, v_f = sp.symbols("m g h v_f", real=True)
-    eqs = [sp.Eq(m * g * h, sp.Rational(1, 2) * m * v_f**2)]
+    m, g, h, v = sp.symbols("m g h v", real=True)
+    eqs = [sp.Eq(m * g * h, sp.Rational(1, 2) * m * v**2)]
     angle = knowns.get("angle")
     if angle is not None:
         N = sp.symbols("N", real=True)
@@ -206,8 +206,8 @@ def build_incline_equations(knowns: dict) -> list[sp.Eq]:
 
 
 def build_energy_conservation_equations(knowns: dict) -> list[sp.Eq]:
-    m, v0, v_f, g, h = sp.symbols("m v0 v_f g h", real=True)
-    return [sp.Eq(sp.Rational(1, 2) * m * v0**2 + m * g * h, sp.Rational(1, 2) * m * v_f**2)]
+    m, v0, v, g, h = sp.symbols("m v0 v g h", real=True)
+    return [sp.Eq(sp.Rational(1, 2) * m * v0**2 + m * g * h, sp.Rational(1, 2) * m * v**2)]
 
 
 def build_momentum_equations(knowns: dict) -> list[sp.Eq]:
@@ -440,7 +440,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
         ]
 
     elif domain == "energy_conservation":
-        v_f = float(solved.get("v_f", 0))
+        v = float(solved.get("v", solved.get("v_f", 0)))
         W = float(solved.get("W", 0))
         h = knowns.get("h", 1)
         t_approx = float((2 * h / g) ** 0.5) if g > 0 else 1
@@ -448,15 +448,15 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
             {
                 "step_id": 1, "concept": "Conservation of Energy",
                 "explanation": "Total mechanical energy is conserved: KE_i + PE_i = KE_f + PE_f",
-                "math_latex": "\\frac{1}{2}mv_0^2 + mgh = \\frac{1}{2}mv_f^2",
+                "math_latex": "\\frac{1}{2}mv_0^2 + mgh = \\frac{1}{2}mv^2",
                 "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": [
                     {"label": "mg", "direction": [0, -1], "magnitude": g, "color": "#ef4444"},
                 ]},
             },
             {
                 "step_id": 2, "concept": "Final Velocity",
-                "explanation": f"v_f = √(v₀² + 2gh) = {v_f:.3f} m/s",
-                "math_latex": f"v_f = \\sqrt{{v_0^2 + 2gh}} = {v_f:.3f}\\,\\text{{m/s}}",
+                "explanation": f"v = √(v₀² + 2gh) = {v:.3f} m/s",
+                "math_latex": f"v = \\sqrt{{v_0^2 + 2gh}} = {v:.3f}\\,\\text{{m/s}}",
                 "simulation_state": {"time_range": [0, t_approx], "animations": [
                     {"target": "object", "type": "polynomial", "params": {"c0": 0, "c1": knowns.get("v0", 0) * DISPLAY_SCALE, "c2": 0.5 * g * DISPLAY_SCALE}}
                 ], "vectors": []},
@@ -465,22 +465,22 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
 
     elif domain == "incline":
         m_val = knowns.get("m", 1)
-        v_f = float(solved.get("v_f", 0))
+        v = float(solved.get("v", solved.get("v_f", 0)))
         W = float(solved.get("W", 0))
         h = knowns.get("h", 1)
         return [
             {
                 "step_id": 1, "concept": "Conservation of Mechanical Energy",
                 "explanation": "On a frictionless incline, potential energy is converted entirely into kinetic energy.",
-                "math_latex": "mgh = \\frac{1}{2}mv_f^2",
+                "math_latex": "mgh = \\frac{1}{2}mv^2",
                 "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": [
                     {"label": "mg", "direction": [0, -1], "magnitude": g, "color": "#ef4444"},
                 ]},
             },
             {
                 "step_id": 2, "concept": "Solve for Final Speed",
-                "explanation": f"Solve mgh = ½mv_f² for v_f, giving v_f = √(2gh) = {v_f:.3f} m/s.",
-                "math_latex": f"v_f = \\sqrt{{2gh}} = {v_f:.3f}\\,\\text{{m/s}}",
+                "explanation": f"Solve mgh = ½mv² for v, giving v = √(2gh) = {v:.3f} m/s.",
+                "math_latex": f"v = \\sqrt{{2gh}} = {v:.3f}\\,\\text{{m/s}}",
                 "simulation_state": {"time_range": [0, 1], "animations": [
                     {"target": "object", "type": "linear", "params": {"start": [0, 0], "end": [h * DISPLAY_SCALE, 0], "duration": 1}}
                 ], "vectors": []},
