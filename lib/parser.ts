@@ -57,53 +57,53 @@ export function extractExplicitUnknowns(text: string, fallback: string[]): strin
   const regex = /(?:find|what\s+is|calculate|determine|solve\s+for)(?:\s+the)?\s+([a-z\s]+)/ig;
   const unknowns = new Set<string>();
 
-  const symbolMap: Record<string, string> = {
-    "initial velocity": "v0",
-    "initial speed": "v0",
-    "final velocity": "v",
-    "final speed": "v",
-    "speed at the top": "v_top",
-    "speed at the bottom": "v_bottom",
-    "minimum speed": "v_min",
-    "minimum velocity": "v_min",
-    "maximum speed": "v_max",
-    "maximum velocity": "v_max",
-    "velocity": "v",
-    "speed": "v",
-    "time": "t",
-    "distance": "d",
-    "displacement": "d",
-    "acceleration": "a",
-    "centripetal acceleration": "a_c",
-    "work": "W",
-    "kinetic energy": "KE",
-    "potential energy": "PE",
-    "energy": "E",
-    "radius": "r",
-    "period of oscillation": "T",
-    "period": "T",
-    "angular frequency": "omega",
-    "frequency": "f",
-    "angular velocity": "omega",
-    "angular speed": "omega",
-    "angular acceleration": "alpha",
-    "moment of inertia": "I",
-    "torque": "tau",
-    "momentum": "p",
-    "net force": "F_net",
-    "force": "F",
-    "spring constant": "k",
-    "angle": "theta"
-  };
+  const symbolMap: [string, string][] = [
+    ["initial velocity", "v0"],
+    ["initial speed", "v0"],
+    ["final velocity", "v"],
+    ["final speed", "v"],
+    ["speed at the top", "v_top"],
+    ["speed at the bottom", "v_bottom"],
+    ["minimum speed", "v_min"],
+    ["minimum velocity", "v_min"],
+    ["maximum speed", "v_max"],
+    ["maximum velocity", "v_max"],
+    ["velocity", "v"],
+    ["speed", "v"],
+    ["time", "t"],
+    ["distance", "d"],
+    ["displacement", "d"],
+    ["acceleration", "a"],
+    ["centripetal acceleration", "a_c"],
+    ["work", "W"],
+    ["kinetic energy", "KE"],
+    ["potential energy", "PE"],
+    ["energy", "E"],
+    ["radius", "r"],
+    ["period of oscillation", "T"],
+    ["period", "T"],
+    ["angular frequency", "omega"],
+    ["frequency", "f"],
+    ["angular velocity", "omega"],
+    ["angular speed", "omega"],
+    ["angular acceleration", "alpha"],
+    ["moment of inertia", "I"],
+    ["torque", "tau"],
+    ["momentum", "p"],
+    ["net force", "F_net"],
+    ["force", "F"],
+    ["spring constant", "k"],
+    ["angle", "theta"]
+  ];
 
-  const sortedKeys = Object.keys(symbolMap).sort((a, b) => b.length - a.length);
+  const sortedPairs = [...symbolMap].sort((a, b) => b[0].length - a[0].length);
 
   let match;
   while ((match = regex.exec(text)) !== null) {
     let targetPhrase = match[1].toLowerCase();
-    for (const key of sortedKeys) {
+    for (const [key, symbol] of sortedPairs) {
       if (targetPhrase.includes(key)) {
-        unknowns.add(symbolMap[key]);
+        unknowns.add(symbol);
         targetPhrase = targetPhrase.replace(key, "");
       }
     }
@@ -269,6 +269,7 @@ export function parsePhysicsProblem(text: string): ParseResult {
     const result = attempt(text);
     if (result) {
       result.unknowns = extractExplicitUnknowns(text, result.unknowns);
+      console.log("Parser extracted unknowns:", result.unknowns);
       return result;
     }
   }
