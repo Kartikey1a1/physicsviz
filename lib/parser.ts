@@ -72,6 +72,7 @@ export function extractExplicitUnknowns(text: string, fallback: string[]): strin
     "energy": "E",
     "radius": "r",
     "period": "T",
+    "angular frequency": "omega",
     "frequency": "f",
     "angular velocity": "omega",
     "angular speed": "omega",
