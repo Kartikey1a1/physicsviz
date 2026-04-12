@@ -383,21 +383,48 @@ def solve_equations(domains: list[str], knowns: dict, unknowns: list[str]) -> di
     return solved
 
 
-def build_steps_for_domains(domains: list[str], knowns: dict, solved: dict, object_type: str) -> list[dict]:
+def build_steps_for_domains(domains: list[str], knowns: dict, solved: dict, unknowns: list[str], object_type: str) -> list[dict]:
     steps: list[dict] = []
     for domain in domains:
         if domain == "energy_conservation" and "incline" in domains:
             continue
         if domain == "centripetal":
-            steps.extend(build_steps_for_domain("vertical_circle", knowns, solved, object_type))
+            steps.extend(build_steps_for_domain("vertical_circle", knowns, solved, unknowns, object_type))
         else:
-            steps.extend(build_steps_for_domain(domain, knowns, solved, object_type))
-    return steps or [{
+            steps.extend(build_steps_for_domain(domain, knowns, solved, unknowns, object_type))
+
+    raw_steps = steps or [{
         "step_id": 1, "concept": "Problem Parsed",
         "explanation": "Domain recognized but detailed steps not yet implemented.",
         "math_latex": "\\text{See knowns and solved values}",
         "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": []},
+        "provides": None, "depends_on": []
     }]
+
+    target_vars = set(unknowns)
+    kept_steps = []
+    
+    for step in reversed(raw_steps):
+        provides = step.get("provides")
+        if provides in target_vars or provides is None:
+            kept_steps.insert(0, step)
+            for d in step.get("depends_on", []):
+                target_vars.add(d)
+
+    final_steps = []
+    for i, step in enumerate(kept_steps):
+        if step.get("provides") is None:
+            if i + 1 < len(kept_steps) and kept_steps[i+1].get("provides") is not None:
+                final_steps.append(step)
+            elif len(kept_steps) == 1:
+                final_steps.append(step)
+        else:
+            final_steps.append(step)
+
+    for i, step in enumerate(final_steps):
+        step["step_id"] = i + 1
+
+    return final_steps
 
 # Scale factor: 1 physical meter = DISPLAY_SCALE canvas pixels.
 # Used consistently across ALL domain builders — never hardcode a pixel value.
@@ -406,7 +433,7 @@ DISPLAY_SCALE = 100  # type: int
 
 # ─── Step & SimState Builders ─────────────────────────────────────────────────
 
-def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type: str) -> list[dict]:
+def build_steps_for_domain(domain: str, knowns: dict, solved: dict, unknowns: list[str], object_type: str) -> list[dict]:
     """Returns solution_steps array. Every step MUST have a simulation_state (parallel array contract)."""
     g = knowns.get("g", 9.81)
 
@@ -418,7 +445,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
         v_f = float(solved.get("v_f", v0 + a * t))
         return [
             {
-                "step_id": 1, "concept": "Identify Knowns",
+                "step_id": 1, "concept": "Identify Knowns", "provides": None, "depends_on": [],
                 "explanation": f"From the problem: initial velocity v₀ = {v0} m/s, acceleration a = {a} m/s², time t = {t} s.",
                 "math_latex": f"v_0 = {v0}\\,\\text{{m/s}},\\quad a = {a}\\,\\text{{m/s}}^2,\\quad t = {t}\\,\\text{{s}}",
                 "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": [
@@ -426,7 +453,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 ]},
             },
             {
-                "step_id": 2, "concept": "Apply Kinematic Equation",
+                "step_id": 2, "concept": "Apply Kinematic Equation", "provides": "d", "depends_on": ["v0", "a", "t"],
                 "explanation": f"Using d = v₀t + ½at², the displacement is {d:.2f} m.",
                 "math_latex": f"d = v_0 t + \\frac{{1}}{{2}} a t^2 = {d:.2f}\\,\\text{{m}}",
                 "simulation_state": {"time_range": [0, t], "animations": [
@@ -434,7 +461,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 ], "vectors": []},
             },
             {
-                "step_id": 3, "concept": "Final Velocity",
+                "step_id": 3, "concept": "Final Velocity", "provides": "v_f", "depends_on": ["v0", "a", "t"],
                 "explanation": f"Final velocity v_f = v₀ + at = {v_f:.2f} m/s.",
                 "math_latex": f"v_f = v_0 + at = {v_f:.2f}\\,\\text{{m/s}}",
                 "simulation_state": {"time_range": [t, t], "animations": [], "vectors": [
@@ -449,7 +476,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
         T_period = float(2 * 3.14159 * r / v_min) if v_min > 0 else 1
         return [
             {
-                "step_id": 1, "concept": "Free Body Diagram at Top",
+                "step_id": 1, "concept": "Free Body Diagram at Top", "provides": None, "depends_on": [],
                 "explanation": "At the top of the loop, gravity and tension both point toward the center.",
                 "math_latex": "T + mg = \\frac{mv^2}{r}",
                 "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": [
@@ -458,13 +485,13 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 ]},
             },
             {
-                "step_id": 2, "concept": "Minimum Speed Condition",
+                "step_id": 2, "concept": "Minimum Speed Condition", "provides": "v_min", "depends_on": ["g", "r"],
                 "explanation": f"At minimum speed, tension T = 0, giving v_min = √(gr) = {v_min:.2f} m/s.",
                 "math_latex": f"v_{{\\min}} = \\sqrt{{gr}} = \\sqrt{{{g} \\times {r}}} = {v_min:.2f}\\,\\text{{m/s}}",
                 "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": []},
             },
             {
-                "step_id": 3, "concept": "Full Circular Motion",
+                "step_id": 3, "concept": "Full Circular Motion", "provides": "omega", "depends_on": ["v_min", "r"],
                 "explanation": f"The object completes the full loop with ω = v/r.",
                 "math_latex": f"\\omega = \\frac{{v_{{\\min}}}}{{r}} = {v_min/r:.2f}\\,\\text{{rad/s}}",
                 "simulation_state": {"time_range": [0, T_period], "animations": [
@@ -482,13 +509,13 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
         v_max = float(solved.get("v_max", A * omega))
         return [
             {
-                "step_id": 1, "concept": "Angular Frequency",
+                "step_id": 1, "concept": "Angular Frequency", "provides": "omega", "depends_on": ["k", "m"],
                 "explanation": f"ω = √(k/m) = √({k}/{m}) = {omega:.3f} rad/s",
                 "math_latex": f"\\omega = \\sqrt{{\\frac{{k}}{{m}}}} = {omega:.3f}\\,\\text{{rad/s}}",
                 "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": []},
             },
             {
-                "step_id": 2, "concept": "Period of Oscillation",
+                "step_id": 2, "concept": "Period of Oscillation", "provides": "T", "depends_on": ["omega"],
                 "explanation": f"T = 2π/ω = {T_period:.3f} s",
                 "math_latex": f"T = \\frac{{2\\pi}}{{\\omega}} = {T_period:.3f}\\,\\text{{s}}",
                 "simulation_state": {"time_range": [0, T_period], "animations": [
@@ -496,7 +523,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 ], "vectors": []},
             },
             {
-                "step_id": 3, "concept": "Maximum Speed",
+                "step_id": 3, "concept": "Maximum Speed", "provides": "v_max", "depends_on": ["A", "omega"],
                 "explanation": f"v_max = Aω = {A}×{omega:.2f} = {v_max:.3f} m/s",
                 "math_latex": f"v_{{\\max}} = A\\omega = {v_max:.3f}\\,\\text{{m/s}}",
                 "simulation_state": {"time_range": [0, T_period], "animations": [
@@ -514,13 +541,13 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
         t = knowns.get("t", 1)
         return [
             {
-                "step_id": 1, "concept": "Angular Acceleration",
+                "step_id": 1, "concept": "Angular Acceleration", "provides": "alpha", "depends_on": ["tau", "I"],
                 "explanation": f"By Newton's 2nd law for rotation: τ = Iα → α = {alpha:.3f} rad/s²",
                 "math_latex": f"\\alpha = \\frac{{\\tau}}{{I}} = {alpha:.3f}\\,\\text{{rad/s}}^2",
                 "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": []},
             },
             {
-                "step_id": 2, "concept": "Angular Velocity",
+                "step_id": 2, "concept": "Angular Velocity", "provides": "omega_f", "depends_on": ["omega0", "alpha", "t"],
                 "explanation": f"ω_f = ω₀ + αt = {omega_f:.3f} rad/s",
                 "math_latex": f"\\omega_f = \\omega_0 + \\alpha t = {omega_f:.3f}\\,\\text{{rad/s}}",
                 "simulation_state": {"time_range": [0, t], "animations": [
@@ -528,7 +555,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 ], "vectors": []},
             },
             {
-                "step_id": 3, "concept": "Angle Rotated",
+                "step_id": 3, "concept": "Angle Rotated", "provides": "theta", "depends_on": ["omega0", "t", "alpha"],
                 "explanation": f"θ = ω₀t + ½αt² = {theta:.3f} rad",
                 "math_latex": f"\\theta = {theta:.3f}\\,\\text{{rad}} = {theta * 180 / 3.14159:.1f}°",
                 "simulation_state": {"time_range": [t, t], "animations": [], "vectors": []},
@@ -542,7 +569,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
         t_approx = float((2 * h / g) ** 0.5) if g > 0 else 1
         return [
             {
-                "step_id": 1, "concept": "Conservation of Energy",
+                "step_id": 1, "concept": "Conservation of Energy", "provides": None, "depends_on": [],
                 "explanation": "Total mechanical energy is conserved: KE_i + PE_i = KE_f + PE_f",
                 "math_latex": "\\frac{1}{2}mv_0^2 + mgh = \\frac{1}{2}mv^2",
                 "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": [
@@ -550,7 +577,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 ]},
             },
             {
-                "step_id": 2, "concept": "Final Velocity",
+                "step_id": 2, "concept": "Final Velocity", "provides": "v", "depends_on": ["v0", "g", "h"],
                 "explanation": f"v = √(v₀² + 2gh) = {v:.3f} m/s",
                 "math_latex": f"v = \\sqrt{{v_0^2 + 2gh}} = {v:.3f}\\,\\text{{m/s}}",
                 "simulation_state": {"time_range": [0, t_approx], "animations": [
@@ -566,7 +593,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
         h = knowns.get("h", 1)
         return [
             {
-                "step_id": 1, "concept": "Conservation of Mechanical Energy",
+                "step_id": 1, "concept": "Conservation of Mechanical Energy", "provides": None, "depends_on": [],
                 "explanation": "On a frictionless incline, potential energy is converted entirely into kinetic energy.",
                 "math_latex": "mgh = \\frac{1}{2}mv^2",
                 "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": [
@@ -574,7 +601,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 ]},
             },
             {
-                "step_id": 2, "concept": "Solve for Final Speed",
+                "step_id": 2, "concept": "Solve for Final Speed", "provides": "v", "depends_on": ["g", "h"],
                 "explanation": f"Solve mgh = ½mv² for v, giving v = √(2gh) = {v:.3f} m/s.",
                 "math_latex": f"v = \\sqrt{{2gh}} = {v:.3f}\\,\\text{{m/s}}",
                 "simulation_state": {"time_range": [0, 1], "animations": [
@@ -582,7 +609,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 ], "vectors": []},
             },
             {
-                "step_id": 3, "concept": "Work Done by Gravity",
+                "step_id": 3, "concept": "Work Done by Gravity", "provides": "W", "depends_on": ["m", "g", "h"],
                 "explanation": f"The work done by gravity equals the loss in potential energy: W = mgh = {W:.2f} J.",
                 "math_latex": f"W = mgh = {m_val} \\cdot {g} \\cdot {h} = {W:.2f}\\,\\text{{J}}",
                 "simulation_state": {"time_range": [1, 1], "animations": [], "vectors": []},
@@ -596,7 +623,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
         v1 = knowns.get("v1", 5)
         return [
             {
-                "step_id": 1, "concept": "Conservation of Momentum",
+                "step_id": 1, "concept": "Conservation of Momentum", "provides": None, "depends_on": [],
                 "explanation": "Total momentum is conserved in all collisions.",
                 "math_latex": "m_1 v_1 + m_2 v_2 = (m_1 + m_2)v_f",
                 "simulation_state": {"time_range": [0, 0], "animations": [
@@ -604,7 +631,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 ], "vectors": []},
             },
             {
-                "step_id": 2, "concept": "Final Velocity After Collision",
+                "step_id": 2, "concept": "Final Velocity After Collision", "provides": "v_f", "depends_on": ["m1", "v1", "m2", "v2"],
                 "explanation": f"v_f = (m₁v₁ + m₂v₂)/(m₁+m₂) = {v_f:.3f} m/s",
                 "math_latex": f"v_f = \\frac{{m_1 v_1 + m_2 v_2}}{{m_1 + m_2}} = {v_f:.3f}\\,\\text{{m/s}}",
                 "simulation_state": {"time_range": [0, 2], "animations": [
@@ -623,7 +650,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
         x_max = float(solved.get("x_max", 10))
         return [
             {
-                "step_id": 1, "concept": "Decompose Initial Velocity",
+                "step_id": 1, "concept": "Decompose Initial Velocity", "provides": "v0y", "depends_on": ["v0", "angle"],
                 "explanation": f"Split v₀ into components: v₀ₓ = {v0x:.2f} m/s, v₀ᵧ = {v0y:.2f} m/s",
                 "math_latex": f"v_{{0x}} = v_0\\cos\\theta = {v0x:.2f}\\,\\text{{m/s}}, \\quad v_{{0y}} = v_0\\sin\\theta = {v0y:.2f}\\,\\text{{m/s}}",
                 "simulation_state": {"time_range": [0, 0], "animations": [], "vectors": [
@@ -632,7 +659,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 ]},
             },
             {
-                "step_id": 2, "concept": "Time of Flight",
+                "step_id": 2, "concept": "Time of Flight", "provides": "t_flight", "depends_on": ["v0y", "g", "h0"],
                 "explanation": f"Solving for when y = 0: t_flight = {t_flight:.3f} s",
                 "math_latex": f"t_{{\\text{{flight}}}} = {t_flight:.3f}\\,\\text{{s}}",
                 "simulation_state": {"time_range": [0, t_flight], "animations": [
@@ -642,7 +669,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, object_type:
                 ], "vectors": []},
             },
             {
-                "step_id": 3, "concept": "Range",
+                "step_id": 3, "concept": "Range", "provides": "x_max", "depends_on": ["v0x", "t_flight"],
                 "explanation": f"Horizontal range x = v₀ₓ · t = {x_max:.3f} m",
                 "math_latex": f"x = v_{{0x}} \\cdot t_{{\\text{{flight}}}} = {x_max:.3f}\\,\\text{{m}}",
                 "simulation_state": {"time_range": [t_flight, t_flight], "animations": [], "vectors": []},
@@ -678,7 +705,7 @@ async def solve(req: SolveRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"SymPy solver error: {str(e)}")
 
-    steps = build_steps_for_domains(req.domains, req.knowns, solved, req.object_type)
+    steps = build_steps_for_domains(req.domains, req.knowns, solved, req.unknowns, req.object_type)
 
     # Latex results for display
     latex = {k: f"{v:.4g}" for k, v in solved.items() if isinstance(v, (int, float))}
