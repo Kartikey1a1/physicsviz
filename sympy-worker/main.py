@@ -442,7 +442,9 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, unknowns: li
         v0 = knowns.get("v0", 0)
         t = knowns.get("t", 0)
         d = float(solved.get("d", v0 * t + 0.5 * a * t**2))
+        solved["d"] = d
         v_f = float(solved.get("v_f", v0 + a * t))
+        solved["v_f"] = v_f
         return [
             {
                 "step_id": 1, "concept": "Identify Knowns", "provides": None, "depends_on": [],
@@ -473,7 +475,10 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, unknowns: li
     elif domain == "vertical_circle":
         r = knowns.get("r", 1)
         v_min = float(solved.get("v_min", (g * r) ** 0.5))
+        solved["v_min"] = v_min
         T_period = float(2 * 3.14159 * r / v_min) if v_min > 0 else 1
+        solved["T"] = T_period
+        solved["omega"] = float(v_min / r) if r > 0 else 0
         return [
             {
                 "step_id": 1, "concept": "Free Body Diagram at Top", "provides": None, "depends_on": [],
@@ -505,8 +510,11 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, unknowns: li
         m = knowns.get("m", 1)
         A = knowns.get("A", 0.1)
         omega = float(solved.get("omega", (k / m) ** 0.5))
+        solved["omega"] = omega
         T_period = float(solved.get("T", 2 * 3.14159 / omega))
+        solved["T"] = T_period
         v_max = float(solved.get("v_max", A * omega))
+        solved["v_max"] = v_max
         return [
             {
                 "step_id": 1, "concept": "Angular Frequency", "provides": "omega", "depends_on": ["k", "m"],
@@ -536,8 +544,11 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, unknowns: li
 
     elif domain == "rotation":
         alpha = float(solved.get("alpha", 0))
+        solved["alpha"] = alpha
         omega_f = float(solved.get("omega_f", 0))
+        solved["omega_f"] = omega_f
         theta = float(solved.get("theta", 0))
+        solved["theta"] = theta
         t = knowns.get("t", 1)
         return [
             {
@@ -564,7 +575,9 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, unknowns: li
 
     elif domain == "energy_conservation":
         v = float(solved.get("v", solved.get("v_f", 0)))
+        solved["v"] = v
         W = float(solved.get("W", 0))
+        solved["W"] = W
         h = knowns.get("h", 1)
         t_approx = float((2 * h / g) ** 0.5) if g > 0 else 1
         return [
@@ -589,7 +602,9 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, unknowns: li
     elif domain == "incline":
         m_val = knowns.get("m", 1)
         v = float(solved.get("v", solved.get("v_f", 0)))
+        solved["v"] = v
         W = float(solved.get("W", 0))
+        solved["W"] = W
         h = knowns.get("h", 1)
         return [
             {
@@ -618,6 +633,7 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, unknowns: li
 
     elif domain == "momentum":
         v_f = float(solved.get("v_f", 0))
+        solved["v_f"] = v_f
         m1 = knowns.get("m1", 1)
         m2 = knowns.get("m2", 1)
         v1 = knowns.get("v1", 5)
@@ -645,9 +661,13 @@ def build_steps_for_domain(domain: str, knowns: dict, solved: dict, unknowns: li
         v0 = knowns.get("v0", 0)
         angle_deg = knowns.get("angle", 0)
         v0x = float(solved.get("v0x", v0 * math.cos(math.radians(angle_deg))))
+        solved["v0x"] = v0x
         v0y = float(solved.get("v0y", v0 * math.sin(math.radians(angle_deg))))
+        solved["v0y"] = v0y
         t_flight = float(solved.get("t_flight", 1))
+        solved["t_flight"] = t_flight
         x_max = float(solved.get("x_max", 10))
+        solved["x_max"] = x_max
         return [
             {
                 "step_id": 1, "concept": "Decompose Initial Velocity", "provides": "v0y", "depends_on": ["v0", "angle"],
