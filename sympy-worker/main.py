@@ -56,7 +56,14 @@ SYMBOLS = {
     "m2":    sp.Symbol("m2",    real=True),
 }
 
-
+ALIASES = {
+    "v_top":    "v",
+    "v_bottom": "v",
+    "v_final":  "v",
+    "v_f":      "v",
+    "v_min":    "v_min",
+    "v_max":    "v",
+}
 
 app = FastAPI(title="PhysicsViz SymPy Worker")
 
