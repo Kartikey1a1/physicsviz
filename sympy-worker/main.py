@@ -264,9 +264,8 @@ def solve_equations(domains: list[str], knowns: dict, unknowns: list[str]) -> di
 
     substituted = [eq.subs(known_subs) for eq in equations]
     all_symbols = set().union(*(eq.free_symbols for eq in substituted))
-    unknown_symbols = [sym for sym in all_symbols if str(sym) in unknowns]
-    if not unknown_symbols:
-        unknown_symbols = [sym for sym in all_symbols if sym not in known_subs]
+    # Solve for all unresolved symbols to avoid overdetermined system failures
+    unknown_symbols = [sym for sym in all_symbols if sym not in known_subs]
     if not unknown_symbols:
         raise HTTPException(status_code=422, detail="No unknown variables found in equations.")
 
@@ -274,8 +273,13 @@ def solve_equations(domains: list[str], knowns: dict, unknowns: list[str]) -> di
     if not solved_list:
         raise HTTPException(status_code=422, detail="Could not solve the requested equations.")
 
-    solution = solved_list[0]
+    if isinstance(solved_list, list) and len(solved_list) > 0:
+        solution = solved_list[0]
+    else:
+        solution = solved_list
+        
     solved = {}
+    import logging
     for sym, val in solution.items():
         try:
             solved[str(sym)] = float(val)
@@ -283,7 +287,7 @@ def solve_equations(domains: list[str], knowns: dict, unknowns: list[str]) -> di
             try:
                 solved[str(sym)] = float(val.evalf())
             except Exception:
-                solved[str(sym)] = str(val)
+                logging.warning(f"Symbolic result for {sym} = {val}. Skipping to prevent crash.")
     return solved
 
 
