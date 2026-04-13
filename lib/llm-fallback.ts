@@ -9,6 +9,46 @@
 import { extractJSON } from "./extract-json";
 import type { ParseResult } from "./parser";
 
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
+
+async function callOpenRouter(payload: unknown): Promise<string> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY not set");
+
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    "Content-Type": "application/json",
+  };
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json().catch((err) => {
+      console.error("OpenRouter JSON parse failed:", err);
+      return null;
+    });
+
+    if (data?.error?.code === 429 || response.status === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
+      continue;
+    }
+
+    if (!data || !data.choices || !data.choices[0]) {
+      console.error("No choices in response:", data);
+      return '{"unknowns": ["v"]}';
+    }
+
+    return data.choices[0].message.content;
+  }
+
+  return '{"unknowns": ["v"]}';
+}
+
 export async function extractUnknown(
   problem: string,
   domains: string[]
@@ -41,37 +81,13 @@ Use these standard physics symbols:
 Problem: "${problem}"`;
 
   try {
-    const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "openrouter/auto",
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0,
-          max_tokens: 50,
-        }),
-      }
-    );
+    const raw = await callOpenRouter({
+      model: OPENROUTER_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0,
+      max_tokens: 50,
+    });
 
-    const data = await response.json();
-    console.log("OpenRouter response:", JSON.stringify(data));
-
-    if (!response.ok) {
-      console.error("OpenRouter error:", data);
-      return ["v"];
-    }
-
-    if (!data.choices || !data.choices[0]) {
-      console.error("No choices in response:", data);
-      return ["v"];
-    }
-
-    const raw = data.choices[0].message.content as string;
     const parsed = extractJSON(raw);
     return (parsed as any).unknowns ?? ["v"];
   } catch (error) {
@@ -79,9 +95,6 @@ Problem: "${problem}"`;
     return ["v"];
   }
 }
-
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL = "openrouter/auto";
 
 const SYSTEM_PROMPT = `You are a physics problem parser. Given a physics word problem, extract all known values and variables.
 
@@ -103,32 +116,16 @@ export async function llmFallbackParse(problem: string): Promise<ParseResult | n
   }
 
   try {
-    const res = await fetch(OPENROUTER_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://physicsviz.app",
-        "X-Title": "PhysicsViz",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: `Parse this physics problem:\n\n${problem}` },
-        ],
-        temperature: 0.1,
-        max_tokens: 512,
-      }),
+    const raw = await callOpenRouter({
+      model: OPENROUTER_MODEL,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: `Parse this physics problem:\n\n${problem}` },
+      ],
+      temperature: 0.1,
+      max_tokens: 512,
     });
 
-    if (!res.ok) {
-      console.error("[LLM Fallback] OpenRouter error:", res.status, await res.text());
-      return null;
-    }
-
-    const json = await res.json();
-    const raw = json.choices?.[0]?.message?.content ?? "";
     const parsed = extractJSON(raw) as ParseResult;
 
     // Basic validation
