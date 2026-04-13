@@ -29,19 +29,24 @@ async function callOpenRouter(payload: unknown): Promise<string> {
   for (const model of FREE_MODELS) {
     console.log("callOpenRouter attempting model:", model);
     for (let attempt = 0; attempt < 2; attempt++) {
-      const response = await fetch(OPENROUTER_URL, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          ...(payload as object),
-          model,
-        }),
-      });
+      let response;
+      let data: any = null;
+      try {
+        response = await fetch(OPENROUTER_URL, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            ...(payload as object),
+            model,
+          }),
+        });
 
-      const data = await response.json().catch((err) => {
-        console.error("OpenRouter JSON parse failed:", err);
-        return null;
-      });
+        data = await response.json();
+        console.log("OpenRouter response:", JSON.stringify(data));
+      } catch (fetchError) {
+        console.error("Fetch error for model", model, ":", fetchError);
+        continue;
+      }
 
       if (data?.error?.code === 429 || response.status === 429) {
         await new Promise((resolve) => setTimeout(resolve, 1500));
