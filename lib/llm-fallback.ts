@@ -40,27 +40,44 @@ Use these standard physics symbols:
 
 Problem: "${problem}"`;
 
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "meta-llama/llama-3.1-8b-instruct:free",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0,
-        max_tokens: 50,
-      }),
-    }
-  );
+  try {
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "meta-llama/llama-3.1-8b-instruct:free",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0,
+          max_tokens: 50,
+        }),
+      }
+    );
 
-  const data = await response.json();
-  const raw = data.choices[0].message.content as string;
-  const parsed = extractJSON(raw);
-  return (parsed as any).unknowns ?? ["v"];
+    const data = await response.json();
+    console.log("OpenRouter response:", JSON.stringify(data));
+
+    if (!response.ok) {
+      console.error("OpenRouter error:", data);
+      return ["v"];
+    }
+
+    if (!data.choices || !data.choices[0]) {
+      console.error("No choices in response:", data);
+      return ["v"];
+    }
+
+    const raw = data.choices[0].message.content as string;
+    const parsed = extractJSON(raw);
+    return (parsed as any).unknowns ?? ["v"];
+  } catch (error) {
+    console.error("extractUnknown failed:", error);
+    return ["v"];
+  }
 }
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
