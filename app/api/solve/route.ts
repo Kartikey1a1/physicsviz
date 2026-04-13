@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   }
 
   // ── Layer 1: Deterministic Regex Parser ─────────────────────────────────────
-  let parsed = parsePhysicsProblem(problem);
+  let parsed = await parsePhysicsProblem(problem);
 
   // ── Layer 2: Free LLM Fallback ───────────────────────────────────────────────
   if (parsed.confidence === "low") {

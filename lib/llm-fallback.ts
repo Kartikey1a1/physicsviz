@@ -9,6 +9,60 @@
 import { extractJSON } from "./extract-json";
 import type { ParseResult } from "./parser";
 
+export async function extractUnknown(
+  problem: string,
+  domains: string[]
+): Promise<string[]> {
+  const prompt = `You are a physics problem parser.
+  
+Given this AP Physics C problem, identify exactly what variable the student is being asked to solve for.
+
+Domain context: ${domains.join(", ")}
+
+Return ONLY a valid JSON object with no explanation:
+{"unknowns": ["symbol"]}
+
+Use these standard physics symbols:
+- v, v0 for velocity/speed (generic)
+- v_min for minimum speed specifically
+- v_max for maximum speed specifically  
+- omega for angular velocity or angular frequency
+- alpha for angular acceleration
+- T for period
+- I for moment of inertia
+- a for acceleration
+- F for force
+- KE, PE for energy
+- p for momentum
+- x, d for position or distance
+- t for time
+- theta for angle
+
+Problem: "${problem}"`;
+
+  const response = await fetch(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "meta-llama/llama-3.1-8b-instruct:free",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0,
+        max_tokens: 50,
+      }),
+    }
+  );
+
+  const data = await response.json();
+  const raw = data.choices[0].message.content as string;
+  const parsed = extractJSON(raw);
+  return (parsed as any).unknowns ?? ["v"];
+}
+
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MODEL = "meta-llama/llama-3.1-8b-instruct:free";
 
