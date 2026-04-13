@@ -27,6 +27,7 @@ async function callOpenRouter(payload: unknown): Promise<string> {
   };
 
   for (const model of FREE_MODELS) {
+    console.log("callOpenRouter attempting model:", model);
     for (let attempt = 0; attempt < 2; attempt++) {
       const response = await fetch(OPENROUTER_URL, {
         method: "POST",
@@ -60,6 +61,7 @@ export async function extractUnknown(
   problem: string,
   domains: string[]
 ): Promise<string[]> {
+  console.log("extractUnknown called with:", problem, domains);
   const prompt = `You are a physics problem parser.
   
 Given this AP Physics C problem, identify exactly what variable the student is being asked to solve for.
@@ -88,6 +90,7 @@ Use these standard physics symbols:
 Problem: "${problem}"`;
 
   try {
+    console.log("Starting OpenRouter call...");
     const raw = await callOpenRouter({
       model: OPENROUTER_MODEL,
       messages: [{ role: "user", content: prompt }],
