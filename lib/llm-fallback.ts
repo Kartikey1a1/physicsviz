@@ -50,7 +50,7 @@ Problem: "${problem}"`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "meta-llama/llama-3.1-8b-instruct:free",
+          model: "meta-llama/llama-3.3-70b-instruct:free",
           messages: [{ role: "user", content: prompt }],
           temperature: 0,
           max_tokens: 50,
@@ -81,7 +81,7 @@ Problem: "${problem}"`;
 }
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL = "meta-llama/llama-3.1-8b-instruct:free";
+const MODEL = "meta-llama/llama-3.3-70b-instruct:free";
 
 const SYSTEM_PROMPT = `You are a physics problem parser. Given a physics word problem, extract all known values and variables.
 
