@@ -11,6 +11,11 @@ import type { ParseResult } from "./parser";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
+const FREE_MODELS = [
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "meta-llama/llama-3.2-3b-instruct:free",
+  "google/gemma-3-12b-it:free",
+];
 
 async function callOpenRouter(payload: unknown): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -21,29 +26,31 @@ async function callOpenRouter(payload: unknown): Promise<string> {
     "Content-Type": "application/json",
   };
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const response = await fetch(OPENROUTER_URL, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-    });
+  for (const model of FREE_MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          ...(payload as object),
+          model,
+        }),
+      });
 
-    const data = await response.json().catch((err) => {
-      console.error("OpenRouter JSON parse failed:", err);
-      return null;
-    });
+      const data = await response.json().catch((err) => {
+        console.error("OpenRouter JSON parse failed:", err);
+        return null;
+      });
 
-    if (data?.error?.code === 429 || response.status === 429) {
-      await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
-      continue;
+      if (data?.error?.code === 429 || response.status === 429) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        continue;
+      }
+
+      if (data?.choices?.[0]?.message?.content) {
+        return data.choices[0].message.content;
+      }
     }
-
-    if (!data || !data.choices || !data.choices[0]) {
-      console.error("No choices in response:", data);
-      return '{"unknowns": ["v"]}';
-    }
-
-    return data.choices[0].message.content;
   }
 
   return '{"unknowns": ["v"]}';
